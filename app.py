@@ -37,8 +37,6 @@ class User(Base):
 #     person_id = Column(Integer, ForeignKey('person.id'))
 #     person = relationship(Person)
 
-# Create an engine that stores data in the local directory's
-# sqlalchemy_example.db file.
 engine = create_engine('sqlite:///chatapp.db')
 Base.metadata.create_all(engine)
 Base.metadata.bind = engine
@@ -54,20 +52,20 @@ session = DBSession()
 
 app = Flask(__name__)
 api = Api(app)
-
-DATABASE = './chatapp.db'
-
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-    return db
-
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
+#
+# DATABASE = './chatapp.db'
+#
+# def get_db():
+#     db = getattr(g, '_database', None)
+#     if db is None:
+#         db = g._database = sqlite3.connect(DATABASE)
+#     return db
+#
+# @app.teardown_appcontext
+# def close_connection(exception):
+#     db = getattr(g, '_database', None)
+#     if db is not None:
+#         db.close()
 
 # app.config['MYSQL_DATABASE_USER'] = 'root'
 # app.config['MYSQL_DATABASE_PASSWORD'] = 'root123'
@@ -86,9 +84,14 @@ class LoginUser(Resource):
             args = parser.parse_args()
 
             _userEmail = args['email']
-            new_person = User(UserName=_userEmail)
-            session.add(new_person)
-            session.commit()
+            try:
+                user = session.query(User).filter(User.UserName == _userEmail).first()
+                if user is not None:
+                    return {"Message": "Existing User"}
+            except Exception as e:
+                new_person = User(UserName=_userEmail)
+                session.add(new_person)
+                session.commit()
 
             return {'Email': _userEmail}
 
