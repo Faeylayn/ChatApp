@@ -15,7 +15,8 @@ from flask import g
 # from flask.ext.mysql import MySQL
 import os
 import sys
-from sqlalchemy import Column, ForeignKey, Integer, String
+import datetime
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
@@ -28,14 +29,14 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     UserName = Column(String(250), nullable=False)
 
-# class Message(Base):
-#     __tablename__ = 'address'
-#     id = Column(Integer, primary_key=True)
-#     street_name = Column(String(250))
-#     street_number = Column(String(250))
-#     post_code = Column(String(250), nullable=False)
-#     person_id = Column(Integer, ForeignKey('person.id'))
-#     person = relationship(Person)
+
+class Message(Base):
+    __tablename__ = 'Message'
+    id = Column(Integer, primary_key=True)
+    Text = Column(Text, nullable=False)
+    PostTime = Column(DateTime, nullable=False)
+    UserId = Column(Integer, ForeignKey('ChatUser.id'))
+    User = relationship(User)
 
 engine = create_engine('sqlite:///chatapp.db')
 Base.metadata.create_all(engine)
@@ -80,25 +81,50 @@ class LoginUser(Resource):
         try:
             # cur = get_db().cursor()
             parser = reqparse.RequestParser()
-            parser.add_argument('email', type=str, help='Email address to lookup/create user')
+            parser.add_argument('UserName', type=str, help='user_name address to lookup/create user')
             args = parser.parse_args()
 
-            _userEmail = args['email']
-            try:
-                user = session.query(User).filter(User.UserName == _userEmail).first()
-                if user is not None:
-                    return {"Message": "Existing User"}
-            except Exception as e:
-                new_person = User(UserName=_userEmail)
+            user_name = args['UserName']
+            user = session.query(User).filter(User.UserName == user_name).first()
+            if user is not None:
+                return {"Message": "Existing User"}
+            else:
+                new_person = User(UserName=user_name)
                 session.add(new_person)
                 session.commit()
 
-            return {'Email': _userEmail}
+            return {'user_name': user_name}
 
         except Exception as e:
             return {'error': str(e)}
 
 api.add_resource(LoginUser, '/LoginUser')
+
+class PostMessage(Resource):
+    def post(self):
+        try:
+            # cur = get_db().cursor()
+            parser = reqparse.RequestParser()
+            parser.add_argument('UserId', type=str, help='User id of the posting user')
+            parser.add_argument('Text', type=str, help='text of the message')
+            args = parser.parse_args()
+
+            user_id = args['UserId']
+            text = args['Text']
+
+            new_message = Message(Text=text, UserId=user_id, PostTime=datetime.datetime.utcnow())
+            session.add(new_message)
+            session.commit()
+
+            return {
+            'Message': new_message.Text,
+            'Time': new_message.PostTime.isoformat()
+            }
+
+        except Exception as e:
+            return {'error': str(e)}
+
+api.add_resource(PostMessage, '/PostMessage')
 
 if __name__ == '__main__':
     app.run(debug=True)
