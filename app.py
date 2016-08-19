@@ -126,5 +126,34 @@ class PostMessage(Resource):
 
 api.add_resource(PostMessage, '/PostMessage')
 
+class RetreiveMessages(Resource):
+    def get(self):
+        try:
+            # cur = get_db().cursor()
+            parser = reqparse.RequestParser()
+            parser.add_argument('NewMessage', type=str, help='Flag if the request should just pull new messages')
+            args = parser.parse_args()
+
+            new_flag = args['NewMessage']
+
+            messages = session.query(Message).limit(20).all()
+            return_messages = []
+
+            for message in messages:
+                mess_dict = {
+                'text': message.Text,
+                'UserId': message.UserId
+                }
+                return_messages.append(mess_dict)
+
+            return {
+            'Message': return_messages
+            }
+
+        except Exception as e:
+            return {'error': str(e)}
+
+api.add_resource(RetreiveMessages, '/RetreiveMessages')
+
 if __name__ == '__main__':
     app.run(debug=True)
