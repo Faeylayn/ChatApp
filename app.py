@@ -21,6 +21,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from flask_cors import CORS, cross_origin
 
 Base = declarative_base()
 
@@ -52,6 +53,7 @@ session = DBSession()
 
 
 app = Flask(__name__)
+CORS(app)
 api = Api(app)
 #
 # DATABASE = './chatapp.db'
