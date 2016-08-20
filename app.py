@@ -1,16 +1,14 @@
-from flask import Flask
+from flask import Flask, g
 from flask_restful import Resource, Api, reqparse
 import sqlite3
-from flask import g
 import os
 import sys
 import datetime
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import relationship, sessionmaker
 from flask_cors import CORS, cross_origin
+from flask_socketio import SocketIO, send, emit
 
 Base = declarative_base()
 
@@ -25,8 +23,7 @@ class Message(Base):
     id = Column(Integer, primary_key=True)
     Text = Column(Text, nullable=False)
     PostTime = Column(DateTime, nullable=False)
-    UserId = Column(Integer, ForeignKey('ChatUser.id'))
-    User = relationship(User)
+    UserName = Column(String(250), nullable=False)
 
 engine = create_engine('sqlite:///chatapp.db')
 Base.metadata.create_all(engine)
@@ -38,6 +35,7 @@ session = DBSession()
 app = Flask(__name__)
 CORS(app)
 api = Api(app)
+socketio = SocketIO(app)
 
 class LoginUser(Resource):
     def post(self):
@@ -66,26 +64,31 @@ class PostMessage(Resource):
     def post(self):
         try:
             parser = reqparse.RequestParser()
-            parser.add_argument('UserId', type=str, help='User id of the posting user')
+            parser.add_argument('UserName', type=str, help='User id of the posting user')
             parser.add_argument('Text', type=str, help='text of the message')
             args = parser.parse_args()
 
-            user_id = args['UserId']
+            user_name = args['UserName']
             text = args['Text']
 
-            new_message = Message(Text=text, UserId=user_id, PostTime=datetime.datetime.utcnow())
+            new_message = Message(Text=text, UserName=user_name, PostTime=datetime.datetime.utcnow())
             session.add(new_message)
             session.commit()
 
             return {
-            'Message': new_message.Text,
-            'Time': new_message.PostTime.isoformat()
+            'text': new_message.Text,
+            'Time': new_message.PostTime.isoformat(),
+            'UserName': user_name
             }
 
         except Exception as e:
             return {'error': str(e)}
 
 api.add_resource(PostMessage, '/PostMessage')
+
+@socketio.on('Message Sent')
+def handle_my_custom_event(data):
+    emit('Message Posted', data, broadcast=True)
 
 class RetreiveMessages(Resource):
     def get(self):
@@ -102,7 +105,7 @@ class RetreiveMessages(Resource):
             for message in messages:
                 mess_dict = {
                 'text': message.Text,
-                'UserId': message.UserId
+                'UserName': message.UserName
                 }
                 return_messages.append(mess_dict)
 
@@ -116,4 +119,5 @@ class RetreiveMessages(Resource):
 api.add_resource(RetreiveMessages, '/RetreiveMessages')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app)
+    # app.run()
