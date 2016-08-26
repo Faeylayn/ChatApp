@@ -4,7 +4,7 @@ import sqlite3
 import os
 import sys
 import datetime
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text, create_engine
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text, create_engine, desc
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from flask_cors import CORS, cross_origin
@@ -22,7 +22,7 @@ class Message(Base):
     __tablename__ = 'Message'
     id = Column(Integer, primary_key=True)
     Text = Column(Text, nullable=False)
-    PostTime = Column(DateTime, nullable=False)
+    PostTime = Column(Integer, nullable=False)
     UserName = Column(String(250), nullable=False)
 
 engine = create_engine('sqlite:///chatapp.db')
@@ -36,6 +36,11 @@ app = Flask(__name__)
 CORS(app)
 api = Api(app)
 socketio = SocketIO(app)
+
+epoch = datetime.datetime.utcfromtimestamp(0)
+
+def unix_time_millis(dt):
+    return (dt - epoch).total_seconds() * 1000.0
 
 class LoginUser(Resource):
     def post(self):
@@ -67,17 +72,18 @@ class PostMessage(Resource):
             parser.add_argument('UserName', type=str, help='User id of the posting user')
             parser.add_argument('Text', type=str, help='text of the message')
             args = parser.parse_args()
+            print args
 
             user_name = args['UserName']
             text = args['Text']
 
-            new_message = Message(Text=text, UserName=user_name, PostTime=datetime.datetime.utcnow())
+            new_message = Message(Text=text, UserName=user_name, PostTime=unix_time_millis(datetime.datetime.utcnow()))
             session.add(new_message)
             session.commit()
 
             return {
             'text': new_message.Text,
-            'Time': new_message.PostTime.isoformat(),
+            'Time': new_message.PostTime,
             'UserName': user_name
             }
 
@@ -91,21 +97,32 @@ def handle_my_custom_event(data):
     emit('Message Posted', data, broadcast=True)
 
 class RetreiveMessages(Resource):
-    def get(self):
+    def post(self):
         try:
             parser = reqparse.RequestParser()
-            parser.add_argument('NewMessage', type=str, help='Flag if the request should just pull new messages')
+            # parser.add_argument('NewMessage', type=str, help='Flag if the request should just pull new messages')
+            parser.add_argument('earliest', type=str, help='Flag if the request should just pull new messages')
             args = parser.parse_args()
+            print args
 
-            new_flag = args['NewMessage']
+            # new_flag = args['NewMessage']
+            earliest_time = args['earliest']
+            print earliest_time
 
-            messages = session.query(Message).limit(20).all()
+            if earliest_time is None:
+                messages = session.query(Message).order_by(Message.id.desc()).limit(20).all()
+                # messages = session.query(Message).limit(20).all()
+
+            else:
+                messages = session.query(Message).filter(Message.PostTime < earliest_time).order_by(Message.id.desc()).limit(20).all()
             return_messages = []
+            messages.reverse()
 
             for message in messages:
                 mess_dict = {
                 'text': message.Text,
-                'UserName': message.UserName
+                'UserName': message.UserName,
+                'Time': message.PostTime
                 }
                 return_messages.append(mess_dict)
 
