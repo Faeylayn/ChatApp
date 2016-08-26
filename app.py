@@ -100,19 +100,12 @@ class RetreiveMessages(Resource):
     def post(self):
         try:
             parser = reqparse.RequestParser()
-            # parser.add_argument('NewMessage', type=str, help='Flag if the request should just pull new messages')
             parser.add_argument('earliest', type=str, help='Flag if the request should just pull new messages')
             args = parser.parse_args()
-            print args
-
-            # new_flag = args['NewMessage']
             earliest_time = args['earliest']
-            print earliest_time
 
             if earliest_time is None:
                 messages = session.query(Message).order_by(Message.id.desc()).limit(20).all()
-                # messages = session.query(Message).limit(20).all()
-
             else:
                 messages = session.query(Message).filter(Message.PostTime < earliest_time).order_by(Message.id.desc()).limit(20).all()
             return_messages = []
@@ -137,4 +130,3 @@ api.add_resource(RetreiveMessages, '/RetreiveMessages')
 
 if __name__ == '__main__':
     socketio.run(app)
-    # app.run()
